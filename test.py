@@ -62,34 +62,50 @@ blip = blip_decoder(pretrained=blip_url, image_size=image_size, vit='base')
 blip.eval()
 blip = blip.to(device)
 
-img = Image.open(args.image_path).convert('RGB')
-tform = transforms.Compose(
-    [
-        transforms.Resize(224),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-    ]
-)
-img = tform(img)
-img = img.unsqueeze(0).to("cuda")
-
-caption = blip.generate(img, sample=False, num_beams=3, max_length=60, min_length=5) 
-text = clip.tokenize(list(caption)).to(device)
-
 model = torch.load("finetune_clip.pt").to(device)
 
 linear = NeuralNet(1024,[512,256],2).to(device)
 linear = torch.load('clip_linear.pt')
 
+import os
 
-image = preprocess_image(args.image_path,image_size).unsqueeze(0).to(device)
+directory = os.fsencode('/content/TESTSET')
+accuracy = 0
+count = 0
 
-with torch.no_grad():
-    image_features = model.encode_image(image)
-    text_features = model.encode_text(text)
-    
-    emb = torch.cat((image_features, text_features),1)
-    output = linear(emb.float())
-    predict = output.argmax(1)
-    predict = predict.cpu().numpy()
-    print(predict)
+for file in os.listdir(directory):
+  filename = os.fsdecode(file)
+  filename = filename.split('/')[-1]
+  print(filename)
+
+
+  img = Image.open('/content/TESTSET/' + filename).convert('RGB')
+  tform = transforms.Compose(
+      [
+          transforms.Resize(224),
+          transforms.CenterCrop(224),
+          transforms.ToTensor(),
+      ]
+  )
+  img = tform(img)
+  img = img.unsqueeze(0).to("cuda")
+
+  caption = blip.generate(img, sample=False, num_beams=3, max_length=60, min_length=5) 
+  text = clip.tokenize(list(caption)).to(device)
+
+
+  image = preprocess_image(args.image_path,image_size).unsqueeze(0).to(device)
+
+  with torch.no_grad():
+      image_features = model.encode_image(image)
+      text_features = model.encode_text(text)
+      
+      emb = torch.cat((image_features, text_features),1)
+      output = linear(emb.float())
+      predict = output.argmax(1)
+      predict = predict.cpu().numpy()
+      accuracy += int(predict)
+      print(count)
+      count += 1
+
+print('accuracy:', accuracy, 'count:', count)
